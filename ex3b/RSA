@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>RSA Demo with Steps</title>
+  <style>
+    body { font-family: Arial; }
+    input, button { margin: 5px 0; }
+    pre { background: #f4f4f4; padding: 10px; }
+  </style>
+</head>
+<body>
+
+<h2>RSA Encryption / Decryption</h2>
+
+<label>Prime p:</label><br>
+<input type="number" id="p"><br>
+
+<label>Prime q:</label><br>
+<input type="number" id="q"><br>
+
+<label>Public Key e:</label><br>
+<input type="number" id="e"><br>
+
+<label>Message:</label><br>
+<input type="number" id="message"><br><br>
+
+<button onclick="generateKeys()">Generate Keys</button>
+<button onclick="encrypt()">Encrypt</button>
+<button onclick="decrypt()">Decrypt</button>
+
+<h3>Results:</h3>
+<p>n: <span id="n"></span></p>
+<p>φ(n): <span id="phi"></span></p>
+<p>Private key d: <span id="d"></span></p>
+<p>Encrypted: <span id="encrypted"></span></p>
+<p>Decrypted: <span id="decrypted"></span></p>
+
+<h3>Steps:</h3>
+<pre id="steps"></pre>
+
+<script>
+let n, phi, e, d;
+
+function modInverse(e, phi, stepsArr) {
+  for (let i = 1; i < phi; i++) {
+    let val = (i * e) % phi;
+    stepsArr.push(`Trying d = ${i} → (${i} × ${e}) mod ${phi} = ${val}`);
+    
+    if (val === 1) {
+      stepsArr.push(`✅ Found d = ${i} because (${i} × ${e}) mod ${phi} = 1`);
+      return i;
+    }
+  }
+  return null;
+}
+
+function modPow(base, exp, mod) {
+  let result = 1;
+  base = base % mod;
+
+  while (exp > 0) {
+    if (exp % 2 === 1)
+      result = (result * base) % mod;
+
+    exp = Math.floor(exp / 2);
+    base = (base * base) % mod;
+  }
+  return result;
+}
+
+function generateKeys() {
+  const p = parseInt(document.getElementById("p").value);
+  const q = parseInt(document.getElementById("q").value);
+  e = parseInt(document.getElementById("e").value);
+
+  let stepsArr = [];
+
+  if (!p || !q || !e) {
+    alert("Enter all values");
+    return;
+  }
+
+  n = p * q;
+  phi = (p - 1) * (q - 1);
+
+  stepsArr.push(`Step 1: n = p × q = ${p} × ${q} = ${n}`);
+  stepsArr.push(`Step 2: φ(n) = (p-1)(q-1) = (${p}-1)(${q}-1) = ${phi}`);
+  stepsArr.push(`Step 3: Finding d such that (d × e) mod φ(n) = 1`);
+  stepsArr.push(`--- Iterations ---`);
+
+  d = modInverse(e, phi, stepsArr);
+
+  if (!d) {
+    alert("Invalid e! Must be coprime with φ(n)");
+    return;
+  }
+
+  document.getElementById("n").innerText = n;
+  document.getElementById("phi").innerText = phi;
+  document.getElementById("d").innerText = d;
+  document.getElementById("steps").innerText = stepsArr.join("\n");
+}
+
+function encrypt() {
+  const m = parseInt(document.getElementById("message").value);
+
+  if (!n || !e) {
+    alert("Generate keys first!");
+    return;
+  }
+
+  const c = modPow(m, e, n);
+
+  let steps = document.getElementById("steps").innerText;
+  steps += `\n\nStep 4: Encryption`;
+  steps += `\nc = m^e mod n = ${m}^${e} mod ${n} = ${c}`;
+
+  document.getElementById("encrypted").innerText = c;
+  document.getElementById("steps").innerText = steps;
+}
+
+function decrypt() {
+  const c = parseInt(document.getElementById("encrypted").innerText);
+
+  if (!d) {
+    alert("Generate keys first!");
+    return;
+  }
+
+  const m = modPow(c, d, n);
+
+  let steps = document.getElementById("steps").innerText;
+  steps += `\n\nStep 5: Decryption`;
+  steps += `\nm = c^d mod n = ${c}^${d} mod ${n} = ${m}`;
+
+  document.getElementById("decrypted").innerText = m;
+  document.getElementById("steps").innerText = steps;
+}
+</script>
+
+</body>
+</html>
