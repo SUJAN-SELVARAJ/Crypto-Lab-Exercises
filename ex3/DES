@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>S-DES Absolute Complete Visualizer</title>
+<style>
+body{
+    font-family: monospace;
+    background:#111;
+    color:#00ff88;
+    padding:20px;
+}
+input,select,button{
+    margin:5px;
+    padding:6px;
+}
+#output{
+    margin-top:20px;
+}
+.line{
+    margin:4px 0;
+    animation:fade 0.4s ease-in;
+}
+@keyframes fade{
+    from{opacity:0;}
+    to{opacity:1;}
+}
+</style>
+</head>
+
+<body>
+
+<h2>S-DES FULL Mathematical Visualizer</h2>
+
+Key (10-bit): <input type="text" id="key"><br>
+Input (8-bit): <input type="text" id="text"><br>
+Rounds: <input type="number" id="rounds" value="2" min="1"><br>
+
+Mode:
+<select id="mode">
+<option value="encrypt">Encrypt</option>
+<option value="decrypt">Decrypt</option>
+</select><br>
+
+Speed (ms):
+<input type="range" id="speed" min="200" max="2000" value="700">
+<span id="speedVal">700</span><br>
+
+<button onclick="initializeSteps()">Initialize</button>
+<button onclick="play()">Play</button>
+<button onclick="pause()">Pause</button>
+<button onclick="resume()">Resume</button>
+<button onclick="nextStep()">Next</button>
+
+<div id="output"></div>
+
+<script>
+
+const P10=[3,5,2,7,4,10,1,9,8,6];
+const P8=[6,3,7,4,8,5,10,9];
+const IP=[2,6,3,1,4,8,5,7];
+const IP_INV=[4,1,3,5,7,2,8,6];
+const EP=[4,1,2,3,2,3,4,1];
+const P4=[2,4,3,1];
+
+const S0=[[1,0,3,2],[3,2,1,0],[0,2,1,3],[3,1,3,2]];
+const S1=[[0,1,2,3],[2,0,1,3],[3,0,1,0],[2,1,0,3]];
+
+let steps=[];
+let index=0;
+let playing=false;
+let delay=700;
+
+document.getElementById("speed").oninput=function(){
+    delay=this.value;
+    document.getElementById("speedVal").innerText=this.value;
+};
+
+function addStep(t){ steps.push(t); }
+
+function renderStep(){
+    if(index<steps.length){
+        const d=document.createElement("div");
+        d.className="line";
+        d.textContent=steps[index];
+        document.getElementById("output").appendChild(d);
+        index++;
+    }
+}
+
+function nextStep(){
+    renderStep();
+}
+
+function play(){
+    playing=true;
+    autoPlay();
+}
+
+function autoPlay(){
+    if(!playing) return;
+    if(index<steps.length){
+        renderStep();
+        setTimeout(autoPlay,delay);
+    }
+}
+
+function pause(){
+    playing=false;
+}
+
+function resume(){
+    if(!playing){
+        playing=true;
+        autoPlay();
+    }
+}
+
+function permuteWithMapping(bits,table,name){
+    addStep("\n--- "+name+" ---");
+    addStep("Input Block = "+bits);
+    addStep(name+" Positions = "+table.join(' '));
+    let result="";
+    for(let i=0;i<table.length;i++){
+        let pos=table[i]-1;
+        addStep("Pick bit["+ (pos+1) +"] = "+bits[pos]);
+        result+=bits[pos];
+    }
+    addStep(name+" Result = "+result);
+    return result;
+}
+
+function leftShift(bits,n){
+    return bits.slice(n)+bits.slice(0,n);
+}
+
+function xor(a,b){
+    let r="";
+    for(let i=0;i<a.length;i++)
+        r+=(a[i]===b[i])?"0":"1";
+    return r;
+}
+
+function sbox(bits,box){
+    let row=parseInt(bits[0]+bits[3],2);
+    let col=parseInt(bits[1]+bits[2],2);
+    return box[row][col].toString(2).padStart(2,'0');
+}
+
+function initializeSteps(){
+
+    document.getElementById("output").innerHTML="";
+    steps=[]; index=0; playing=false;
+
+    let key=document.getElementById("key").value;
+    let text=document.getElementById("text").value;
+    let rounds=parseInt(document.getElementById("rounds").value);
+    let mode=document.getElementById("mode").value;
+
+/* KEY GENERATION */
+
+    addStep("========== KEY GENERATION ==========");
+    addStep("Original Key = "+key);
+
+    let p10=permuteWithMapping(key,P10,"P10");
+
+    let L=p10.slice(0,5);
+    let R=p10.slice(5);
+
+    addStep("Split:");
+    addStep("Left  = "+L);
+    addStep("Right = "+R);
+
+    addStep("\nLeft Shift by 1");
+    L=leftShift(L,1);
+    R=leftShift(R,1);
+    addStep("Left  = "+L);
+    addStep("Right = "+R);
+
+    let combined=L+R;
+    addStep("Combined (after LS-1) = "+combined);
+
+    let k1=permuteWithMapping(combined,P8,"P8 (K1)");
+
+    addStep("\nLeft Shift by 2");
+    L=leftShift(L,2);
+    R=leftShift(R,2);
+    addStep("Left  = "+L);
+    addStep("Right = "+R);
+
+    combined=L+R;
+    addStep("Combined (after LS-2) = "+combined);
+
+    let k2=permuteWithMapping(combined,P8,"P8 (K2)");
+
+    if(mode==="decrypt"){
+        [k1,k2]=[k2,k1];
+        addStep("Keys Reversed for Decryption");
+    }
+
+/* INITIAL PERMUTATION */
+
+    addStep("\n========== INITIAL PERMUTATION ==========");
+    let ip=permuteWithMapping(text,IP,"IP");
+
+    let left=ip.slice(0,4);
+    let right=ip.slice(4);
+
+    addStep("L0 = "+left);
+    addStep("R0 = "+right);
+
+/* ROUNDS */
+
+    for(let r=1;r<=rounds;r++){
+
+        addStep("\n========== ROUND "+r+" ==========");
+        let keyUsed=(r%2!==0)?k1:k2;
+        addStep("Using Key = "+keyUsed);
+
+        addStep("Right Half before EP = "+right);
+        let ep=permuteWithMapping(right,EP,"EP");
+
+        addStep("\nXOR Operation");
+        addStep("Block A = "+ep);
+        addStep("Block B = "+keyUsed);
+        let x=xor(ep,keyUsed);
+        addStep("Result = "+x);
+
+        let left4=x.slice(0,4);
+        let right4=x.slice(4);
+
+        addStep("\nS0 Input = "+left4);
+        let s0=sbox(left4,S0);
+        addStep("S0 Output = "+s0);
+
+        addStep("S1 Input = "+right4);
+        let s1=sbox(right4,S1);
+        addStep("S1 Output = "+s1);
+
+        let sOutput=s0+s1;
+        addStep("Combined S-Box Output = "+sOutput);
+
+        let p4=permuteWithMapping(sOutput,P4,"P4");
+
+        addStep("\nXOR with Left");
+        addStep("Left = "+left);
+        addStep("P4   = "+p4);
+        left=xor(left,p4);
+        addStep("New Left = "+left);
+
+        if(r!==rounds){
+            addStep("\nSwap Operation");
+            addStep("Before Swap: L="+left+" R="+right);
+            [left,right]=[right,left];
+            addStep("After Swap:  L="+left+" R="+right);
+        }
+    }
+
+/* FINAL COMBINATION */
+
+    addStep("\n========== FINAL COMBINATION ==========");
+    addStep("Left  = "+left);
+    addStep("Right = "+right);
+    let combinedFinal=left+right;
+    addStep("Combined (L+R) = "+combinedFinal);
+
+/* FINAL PERMUTATION */
+
+    let final=permuteWithMapping(combinedFinal,IP_INV,"IP⁻¹");
+    addStep("Final Output = "+final);
+}
+
+</script>
+</body>
+</html>
