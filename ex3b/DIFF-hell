@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Diffie-Hellman Demo</title>
+  <style>
+    body { font-family: Arial; }
+    input, button { margin: 5px 0; }
+    pre { background: #f4f4f4; padding: 10px; }
+  </style>
+</head>
+<body>
+
+<h2>Diffie-Hellman Key Exchange</h2>
+
+<label>Prime (p):</label><br>
+<input type="number" id="p"><br>
+
+<label>Primitive Root (g):</label><br>
+<input type="number" id="g"><br>
+
+<label>Private Key (a - Alice):</label><br>
+<input type="number" id="a"><br>
+
+<label>Private Key (b - Bob):</label><br>
+<input type="number" id="b"><br><br>
+
+<button onclick="calculate()">Generate Keys</button>
+
+<h3>Results:</h3>
+<p>Alice Public Key (A): <span id="A"></span></p>
+<p>Bob Public Key (B): <span id="B"></span></p>
+<p>Shared Secret (Alice): <span id="secretA"></span></p>
+<p>Shared Secret (Bob): <span id="secretB"></span></p>
+
+<h3>Steps:</h3>
+<pre id="steps"></pre>
+
+<script>
+function modPow(base, exp, mod, stepsArr, label="") {
+  let result = 1;
+  let originalBase = base;
+
+  stepsArr.push(`\nCalculating ${label}: ${base}^${exp} mod ${mod}`);
+
+  while (exp > 0) {
+    stepsArr.push(`→ result = (${result} × ${base}) mod ${mod} (if exp odd)`);
+
+    if (exp % 2 === 1) {
+      result = (result * base) % mod;
+    }
+
+    exp = Math.floor(exp / 2);
+    base = (base * base) % mod;
+
+    stepsArr.push(`→ base = ${base}, exp = ${exp}, result = ${result}`);
+  }
+
+  stepsArr.push(`✅ Final ${label} = ${result}\n`);
+  return result;
+}
+
+function calculate() {
+  const p = parseInt(document.getElementById("p").value);
+  const g = parseInt(document.getElementById("g").value);
+  const a = parseInt(document.getElementById("a").value);
+  const b = parseInt(document.getElementById("b").value);
+
+  let stepsArr = [];
+
+  if (!p || !g || !a || !b) {
+    alert("Enter all values");
+    return;
+  }
+
+  stepsArr.push("Step 1: Public values");
+  stepsArr.push(`p = ${p}, g = ${g}`);
+
+  stepsArr.push("\nStep 2: Private keys");
+  stepsArr.push(`Alice's private key a = ${a}`);
+  stepsArr.push(`Bob's private key b = ${b}`);
+
+  // Public keys
+  const A = modPow(g, a, p, stepsArr, "A (Alice public key)");
+  const B = modPow(g, b, p, stepsArr, "B (Bob public key)");
+
+  // Shared secrets
+  const secretA = modPow(B, a, p, stepsArr, "Shared Secret (Alice)");
+  const secretB = modPow(A, b, p, stepsArr, "Shared Secret (Bob)");
+
+  stepsArr.push("Step 5: Verification");
+  stepsArr.push(`Alice computes: B^a mod p = ${secretA}`);
+  stepsArr.push(`Bob computes: A^b mod p = ${secretB}`);
+
+  if (secretA === secretB) {
+    stepsArr.push("✅ Shared secret MATCHES!");
+  } else {
+    stepsArr.push("❌ Error: Secrets do not match!");
+  }
+
+  document.getElementById("A").innerText = A;
+  document.getElementById("B").innerText = B;
+  document.getElementById("secretA").innerText = secretA;
+  document.getElementById("secretB").innerText = secretB;
+  document.getElementById("steps").innerText = stepsArr.join("\n");
+}
+</script>
+
+</body>
+</html>
